@@ -1,0 +1,62 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      cycles:
+        description: "Number of test cycles"
+        required: false
+        default: "100"
+      calibration_secs:
+        description: "Calibration duration (seconds)"
+        required: false
+        default: "60"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Run organism
+        run: |
+          echo "Running ZOT Cell on ${{ matrix.os }}..."
+          echo "Cycles: ${{ github.event.inputs.cycles }}"
+          echo "Calibration: ${{ github.event.inputs.calibration_secs }}s"
+          echo ""
+          ./target/release/zot-cell 2>&1 | tee run_output.txt
+          echo ""
+          echo "Exit code: $?"
+
+      - name: Analyze results
+        run: |
+          python3 analyze.py results.txt 2>&1 | tee analysis.txt
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.os }}
+          path: |
+            results.txt
+            analysis.txt
+            run_output.txt
+
+      - name: Summary
+        run: |
+          echo "## ZOT Cell Benchmark — ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat analysis.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,7 @@
+/target
+results.txt
+analysis.txt
+run_output.txt
+*.swp
+*.swo
+.DS_Store

@@ -1,0 +1,13 @@
+[package]
+name = "zot-cell"
+version = "2.0.0"
+edition = "2021"
+description = "Darwinian Kinetic Proofreading Organism — a digital immune system that detects substrate anomalies through evolved receptor populations"
+license = "MIT"
+repository = "https://github.com/user/zot-cell"
+keywords = ["immune-system", "anomaly-detection", "kinetic-proofreading", "darwinian", "substrate-sensing"]
+categories = ["science", "simulation"]
+
+[[bin]]
+name = "zot-cell"
+path = "src/main.rs"
