@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://github.com/zot-run/zot-cell/actions/workflows/build.yml"><img src="https://github.com/zot-run/zot-cell/actions/workflows/build.yml/badge.svg" alt="Build"></a>
-  <a href="https://github.com/zot-run/zot-cell/actions/workflows/benchmark.yml"><img src="https://github.com/zot-run/zot-cell/actions/workflows/benchmark.yml/badge.svg" alt="Benchmark"></a>
+  <a href="https://github.com/zot-run/zot-cell/actions/workflows/benchmark.yml"><img src="https://github.com/zot-run/zot-cell/actions/workflows/benchmark.yml/badge.svg?event=workflow_dispatch" alt="Benchmark"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.70%2B-orange.svg" alt="Rust 1.70+"></a>
   <img src="https://img.shields.io/badge/zero-dependencies-brightgreen.svg" alt="Zero Dependencies">
