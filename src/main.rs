@@ -43,7 +43,9 @@ const QUORUM_FRACTION: f64 = 0.10;
 fn probe_memory() -> f64 {
     const SIZE: usize = 1024 * 1024;
     let mut buf = vec![0u8; SIZE];
-    for i in (0..SIZE).step_by(64) { buf[i] = ((i + 64) % SIZE & 0xFF) as u8; }
+    for i in (0..SIZE).step_by(64) {
+        buf[i] = (((i + 64) % SIZE) & 0xFF) as u8;
+    }
     let start = Instant::now();
     let mut idx: usize = 0;
     for _ in 0..(SIZE / 64) * 6 {
@@ -56,7 +58,9 @@ fn probe_memory() -> f64 {
 
 fn probe_clock() -> f64 {
     let a = Instant::now();
-    for _ in 0..80 { std::hint::black_box(Instant::now()); }
+    for _ in 0..80 {
+        std::hint::black_box(Instant::now());
+    }
     Instant::now().duration_since(a).as_nanos() as f64
 }
 
@@ -64,7 +68,9 @@ fn probe_alloc() -> f64 {
     let start = Instant::now();
     for _ in 0..8 {
         let mut v = vec![0u8; 64 * 1024];
-        for i in (0..v.len()).step_by(4096) { v[i] = 1; }
+        for i in (0..v.len()).step_by(4096) {
+            v[i] = 1;
+        }
         std::hint::black_box(&v);
         drop(v);
     }
@@ -78,7 +84,7 @@ fn read_sensors() -> [f64; NUM_SENSORS] {
     mems.sort_by(|a, b| a.partial_cmp(b).unwrap());
     clks.sort_by(|a, b| a.partial_cmp(b).unwrap());
     alcs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    [mems[mems.len()/2], clks[clks.len()/2], alcs[alcs.len()/2]]
+    [mems[mems.len() / 2], clks[clks.len() / 2], alcs[alcs.len() / 2]]
 }
 
 // --- CALIBRATION ---
@@ -109,9 +115,11 @@ impl SensorProfile {
     /// Anomaly signal: how far below p20 is this reading?
     /// Returns 0.0 if at or above p20, up to 1.0 if at p2 or below.
     fn anomaly(&self, value: f64) -> f64 {
-        if value >= self.p20 { return 0.0; }
+        if value >= self.p20 {
+            return 0.0;
+        }
         let range = (self.p20 - self.p2).max(1.0);
-        ((self.p20 - value) / range).max(0.0).min(1.0)
+        ((self.p20 - value) / range).clamp(0.0, 1.0)
     }
 }
 
@@ -149,9 +157,9 @@ struct Receptor {
     weight_b: f64,
 
     // Signal processing weights
-    pct_w: f64,    // percentile anomaly weight
-    trans_w: f64,  // transition weight
-    lock_w: f64,   // lock (stability) weight
+    pct_w: f64,   // percentile anomaly weight
+    trans_w: f64, // transition weight
+    lock_w: f64,  // lock (stability) weight
 
     // Temporal windows
     short_window: usize,
@@ -189,7 +197,9 @@ impl Receptor {
         // Pick 2 different sensors
         let sa = (next() * NUM_SENSORS as f64) as usize % NUM_SENSORS;
         let mut sb = (next() * (NUM_SENSORS - 1) as f64) as usize % NUM_SENSORS;
-        if sb >= sa { sb = (sb + 1) % NUM_SENSORS; }
+        if sb >= sa {
+            sb = (sb + 1) % NUM_SENSORS;
+        }
 
         let wa = 0.3 + next() * 0.4; // 0.3-0.7
         let wb = 1.0 - wa;
@@ -207,16 +217,29 @@ impl Receptor {
         let feedback = 0.05 + next() * 0.15;
 
         Receptor {
-            sensor_a: sa, sensor_b: sb,
-            weight_a: wa, weight_b: wb,
-            pct_w: pw / total, trans_w: tw / total, lock_w: lw / total,
-            short_window: short, long_window: long,
-            kpr_n, kpr_m: kpr_m.min(kpr_n - 1).max(1),
-            threshold, feedback_boost: feedback,
-            consecutive: 0, gap_count: 0, feedback_active: false,
+            sensor_a: sa,
+            sensor_b: sb,
+            weight_a: wa,
+            weight_b: wb,
+            pct_w: pw / total,
+            trans_w: tw / total,
+            lock_w: lw / total,
+            short_window: short,
+            long_window: long,
+            kpr_n,
+            kpr_m: kpr_m.min(kpr_n - 1).max(1),
+            threshold,
+            feedback_boost: feedback,
+            consecutive: 0,
+            gap_count: 0,
+            feedback_active: false,
             eff_threshold: threshold,
-            confidence: 0.4, fires: 0, correct: 0,
-            is_memory: false, age: 0, generation: 0,
+            confidence: 0.4,
+            fires: 0,
+            correct: 0,
+            is_memory: false,
+            age: 0,
+            generation: 0,
         }
     }
 
@@ -236,38 +259,51 @@ impl Receptor {
         child.trans_w = perturb(self.trans_w, 0.0, 0.7);
         child.lock_w = perturb(self.lock_w, 0.0, 0.7);
         let t = child.pct_w + child.trans_w + child.lock_w;
-        child.pct_w /= t; child.trans_w /= t; child.lock_w /= t;
+        child.pct_w /= t;
+        child.trans_w /= t;
+        child.lock_w /= t;
 
         child.threshold = perturb(self.threshold, 0.15, 0.65);
         child.feedback_boost = perturb(self.feedback_boost, 0.03, 0.25);
 
         rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
         if (rng >> 60) < 4 {
-            child.short_window = (self.short_window as i32 + if rng & 1 == 0 { 1 } else { -1 })
-                .max(2).min(6) as usize;
+            child.short_window =
+                (self.short_window as i32 + if rng & 1 == 0 { 1 } else { -1 }).clamp(2, 6) as usize;
         }
         rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
         if (rng >> 60) < 4 {
             child.long_window = (self.long_window as i32 + if rng & 1 == 0 { 1 } else { -1 })
-                .max(child.short_window as i32 + 3).min(15) as usize;
+                .max(child.short_window as i32 + 3)
+                .min(15) as usize;
         }
         rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
         if (rng >> 60) < 3 {
-            child.kpr_n = (self.kpr_n as i32 + if rng & 1 == 0 { 1 } else { -1 }).max(2).min(6) as u32;
+            child.kpr_n =
+                (self.kpr_n as i32 + if rng & 1 == 0 { 1 } else { -1 }).clamp(2, 6) as u32;
             child.kpr_m = child.kpr_m.min(child.kpr_n - 1).max(1);
         }
         // Occasionally swap a sensor
         rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1);
-        if (rng >> 60) < 2 { // ~12%
+        if (rng >> 60) < 2 {
+            // ~12%
             let new_s = (rng >> 50) as usize % NUM_SENSORS;
-            if new_s != child.sensor_b { child.sensor_a = new_s; }
-            else if new_s != child.sensor_a { child.sensor_b = new_s; }
+            if new_s != child.sensor_b {
+                child.sensor_a = new_s;
+            } else if new_s != child.sensor_a {
+                child.sensor_b = new_s;
+            }
         }
 
-        child.consecutive = 0; child.gap_count = 0;
-        child.feedback_active = false; child.eff_threshold = child.threshold;
-        child.confidence = 0.35; child.fires = 0; child.correct = 0;
-        child.is_memory = false; child.age = 0;
+        child.consecutive = 0;
+        child.gap_count = 0;
+        child.feedback_active = false;
+        child.eff_threshold = child.threshold;
+        child.confidence = 0.35;
+        child.fires = 0;
+        child.correct = 0;
+        child.is_memory = false;
+        child.age = 0;
         child.generation = self.generation + 1;
         child
     }
@@ -275,7 +311,9 @@ impl Receptor {
     /// Compute signal from multi-sensor history.
     fn compute_signal(&self, history: &[[f64; NUM_SENSORS]], profile: &CalibrationProfile) -> f64 {
         let n = history.len();
-        if n == 0 { return 0.0; }
+        if n == 0 {
+            return 0.0;
+        }
 
         let current = &history[n - 1];
 
@@ -287,9 +325,13 @@ impl Receptor {
         // Quiet fast-mode: memory drops but clock/alloc stay normal -> one sensor = 0.
         // Threat: multiple sensors affected -> both > 0.
         let pct = anom_a * self.weight_a + anom_b * self.weight_b;
-        if pct <= 0.0 { return 0.0; }
+        if pct <= 0.0 {
+            return 0.0;
+        }
         // Require both sensors to contribute. Single-sensor anomaly is damped.
-        if anom_a < 0.01 || anom_b < 0.01 { return pct * 0.3; }
+        if anom_a < 0.01 || anom_b < 0.01 {
+            return pct * 0.3;
+        }
 
         // Transition signal on primary sensor
         let trans = if n >= self.long_window {
@@ -299,11 +341,16 @@ impl Receptor {
             let short_mean = history[short_start..].iter().map(|h| h[sa]).sum::<f64>()
                 / self.short_window as f64;
             let long_slice = &history[long_start..short_start];
-            let long_mean = if long_slice.is_empty() { short_mean }
-                else { long_slice.iter().map(|h| h[sa]).sum::<f64>() / long_slice.len() as f64 };
+            let long_mean = if long_slice.is_empty() {
+                short_mean
+            } else {
+                long_slice.iter().map(|h| h[sa]).sum::<f64>() / long_slice.len() as f64
+            };
             let delta = (long_mean - short_mean) / profile.sensors[sa].std;
-            delta.max(0.0).min(1.0)
-        } else { 0.0 };
+            delta.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
         // Lock signal on primary sensor — measures stability
         let lock = if n >= self.short_window {
@@ -312,8 +359,10 @@ impl Receptor {
             let w: Vec<f64> = history[start..].iter().map(|h| h[sa]).collect();
             let wm = w.iter().sum::<f64>() / w.len() as f64;
             let wstd = (w.iter().map(|v| (v - wm).powi(2)).sum::<f64>() / w.len() as f64).sqrt();
-            (1.0 - wstd / profile.sensors[sa].std).max(0.0).min(1.0)
-        } else { 0.0 };
+            (1.0 - wstd / profile.sensors[sa].std).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
 
         (pct * self.pct_w + trans * self.trans_w + lock * self.lock_w).min(1.0)
     }
@@ -345,7 +394,9 @@ impl Receptor {
             if truth {
                 self.correct += 1;
                 self.confidence = (self.confidence + 0.04).min(1.0);
-                if self.confidence >= MEMORY_THRESHOLD { self.is_memory = true; }
+                if self.confidence >= MEMORY_THRESHOLD {
+                    self.is_memory = true;
+                }
             } else {
                 self.confidence = (self.confidence - 0.10).max(0.0);
             }
@@ -353,10 +404,13 @@ impl Receptor {
     }
 
     fn accuracy(&self) -> f64 {
-        if self.fires == 0 { 0.5 } else { self.correct as f64 / self.fires as f64 }
+        if self.fires == 0 {
+            0.5
+        } else {
+            self.correct as f64 / self.fires as f64
+        }
     }
 }
-
 
 // --- THREATS ---
 
@@ -393,7 +447,8 @@ fn start_threat(kind: u32) -> (Arc<AtomicBool>, Vec<thread::JoinHandle<()>>) {
         0 => (0..4).map(|_| spawn_cpu_stress(stop.clone())).collect(),
         1 => (0..4).map(|_| spawn_cache_thrash(stop.clone())).collect(),
         _ => {
-            let mut h: Vec<thread::JoinHandle<()>> = (0..2).map(|_| spawn_cpu_stress(stop.clone())).collect();
+            let mut h: Vec<thread::JoinHandle<()>> =
+                (0..2).map(|_| spawn_cpu_stress(stop.clone())).collect();
             h.extend((0..2).map(|_| spawn_cache_thrash(stop.clone())));
             h
         }
@@ -404,10 +459,11 @@ fn start_threat(kind: u32) -> (Arc<AtomicBool>, Vec<thread::JoinHandle<()>>) {
 
 fn stop_threat(stop: Arc<AtomicBool>, handles: Vec<thread::JoinHandle<()>>) {
     stop.store(true, Ordering::Relaxed);
-    for h in handles { let _ = h.join(); }
+    for h in handles {
+        let _ = h.join();
+    }
     thread::sleep(Duration::from_millis(200));
 }
-
 
 // --- CELL: the organism ---
 
@@ -432,12 +488,18 @@ impl Cell {
         }
         eprintln!("  collected {} samples", samples.len());
         let profile = CalibrationProfile::from_samples(samples);
-        eprintln!("  sensor 0 (mem):   mean={:.0} std={:.0} p20={:.0}",
-            profile.sensors[0].mean, profile.sensors[0].std, profile.sensors[0].p20);
-        eprintln!("  sensor 1 (clock): mean={:.0} std={:.0} p20={:.0}",
-            profile.sensors[1].mean, profile.sensors[1].std, profile.sensors[1].p20);
-        eprintln!("  sensor 2 (alloc): mean={:.0} std={:.0} p20={:.0}",
-            profile.sensors[2].mean, profile.sensors[2].std, profile.sensors[2].p20);
+        eprintln!(
+            "  sensor 0 (mem):   mean={:.0} std={:.0} p20={:.0}",
+            profile.sensors[0].mean, profile.sensors[0].std, profile.sensors[0].p20
+        );
+        eprintln!(
+            "  sensor 1 (clock): mean={:.0} std={:.0} p20={:.0}",
+            profile.sensors[1].mean, profile.sensors[1].std, profile.sensors[1].p20
+        );
+        eprintln!(
+            "  sensor 2 (alloc): mean={:.0} std={:.0} p20={:.0}",
+            profile.sensors[2].mean, profile.sensors[2].std, profile.sensors[2].p20
+        );
 
         let seed = Instant::now().elapsed().as_nanos() as u64 ^ 0xDEAD_BEEF;
         let mut cell = Cell {
@@ -483,7 +545,9 @@ impl Cell {
             for window in &test_windows {
                 let sig = c.compute_signal(window, &self.profile);
                 let fired = c.kpr_step(sig);
-                if fired { fires += 1; }
+                if fired {
+                    fires += 1;
+                }
                 // Reset cascade between windows
                 c.consecutive = 0;
                 c.gap_count = 0;
@@ -504,7 +568,6 @@ impl Cell {
         eprintln!("  survivors: {}/{THYMUS_CANDIDATES}", survivors.len());
         self.receptors = survivors;
     }
-
 
     fn decide(&mut self) -> (bool, usize, f64) {
         let reading = read_sensors();
@@ -571,7 +634,9 @@ impl Cell {
         let mut new_receptors = Vec::new();
         let clone_count = CLONE_BATCH.min(by_fitness.len());
         for &idx in by_fitness.iter().take(clone_count) {
-            if self.receptors.len() + new_receptors.len() >= MAX_RECEPTORS { break; }
+            if self.receptors.len() + new_receptors.len() >= MAX_RECEPTORS {
+                break;
+            }
             let s = self.next_seed();
             let child = self.receptors[idx].mutate(s);
             new_receptors.push(child);
@@ -589,7 +654,6 @@ impl Cell {
         self.receptors.iter().filter(|r| r.is_memory).count()
     }
 }
-
 
 // --- MAIN ---
 
@@ -625,7 +689,11 @@ fn main() {
             }
             if is_threat_period {
                 let kind = threat_types[(period / 2) as usize % threat_types.len()];
-                let tname = match kind % 3 { 0 => "CPU", 1 => "Cache", _ => "Mixed" };
+                let tname = match kind % 3 {
+                    0 => "CPU",
+                    1 => "Cache",
+                    _ => "Mixed",
+                };
                 eprintln!("  c{cycle:03}: START threat ({tname})");
                 active_threat = Some(start_threat(kind));
             }
@@ -634,20 +702,40 @@ fn main() {
         let truth = is_threat_period;
         let (block, fire_count, vote_pct) = cell.decide();
         let correct = block == truth;
-        if correct { total_correct += 1; }
+        if correct {
+            total_correct += 1;
+        }
 
         // Get raw sensor values for CSV (last reading in history)
         let raw = cell.history.last().copied().unwrap_or([0.0; NUM_SENSORS]);
 
-        let mark = if correct { "ok" } else if block && !truth { "FP" } else { "MISS" };
-        eprintln!("  c{cycle:03} [{}] vote={vote_pct:.3} fire={fire_count} pop={} mem={} {mark}",
+        let mark = if correct {
+            "ok"
+        } else if block && !truth {
+            "FP"
+        } else {
+            "MISS"
+        };
+        eprintln!(
+            "  c{cycle:03} [{}] vote={vote_pct:.3} fire={fire_count} pop={} mem={} {mark}",
             if truth { "T" } else { "Q" },
-            cell.receptors.len(), cell.memory_count());
+            cell.receptors.len(),
+            cell.memory_count()
+        );
 
-        writeln!(out, "{cycle},{},{},{},{vote_pct:.4},{fire_count},{},{},{:.0},{:.0},{:.0}",
-            truth as u8, block as u8, correct as u8,
-            cell.receptors.len(), cell.memory_count(),
-            raw[0], raw[1], raw[2]).unwrap();
+        writeln!(
+            out,
+            "{cycle},{},{},{},{vote_pct:.4},{fire_count},{},{},{:.0},{:.0},{:.0}",
+            truth as u8,
+            block as u8,
+            correct as u8,
+            cell.receptors.len(),
+            cell.memory_count(),
+            raw[0],
+            raw[1],
+            raw[2]
+        )
+        .unwrap();
 
         // Feedback
         cell.learn(truth);
@@ -671,6 +759,12 @@ fn main() {
 
     // Summary line in CSV
     writeln!(out, "---,---,---,---,---,---,---,---,---,---,---").unwrap();
-    writeln!(out, "# accuracy={:.4} detection=? fp=? pop={} mem={}",
-        acc, cell.receptors.len(), cell.memory_count()).unwrap();
+    writeln!(
+        out,
+        "# accuracy={:.4} detection=? fp=? pop={} mem={}",
+        acc,
+        cell.receptors.len(),
+        cell.memory_count()
+    )
+    .unwrap();
 }
